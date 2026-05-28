@@ -1,1 +1,7 @@
-{}
+{
+  "functions": {
+    "api/models.py": {
+      "includeFiles": "api/public/**"
+    }
+  }
+}
