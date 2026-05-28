@@ -11,3 +11,4 @@ logs/
 
 # Local dev overrides
 .env.local
+.vercel

@@ -2,7 +2,7 @@
 name = "model-meter"
 version = "0.1.0"
 description = "LLM intelligence vs. cost chart for Hatz.AI models"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -20,6 +20,10 @@ ignore = []
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+# --- Vercel ---
+[tool.vercel]
+entrypoint = "api.models:app"
 
 # --- pytest ---
 [tool.pytest.ini_options]

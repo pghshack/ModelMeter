@@ -1,11 +1,5 @@
 {
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/models" }
-  ],
-  "functions": {
-    "api/models.py": {
-      "runtime": "python3.12",
-      "maxDuration": 30
-    }
-  }
+  ]
 }

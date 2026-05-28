@@ -1,40 +1,38 @@
-"""Vercel serverless handler for /api/models and /api/refresh."""
-import json
-import sys
+"""FastAPI app for Vercel — serves /api/models and /api/refresh."""
 import os
-from http.server import BaseHTTPRequestHandler
+import sys
 
-# Allow importing from the api/ sibling _lib
 sys.path.insert(0, os.path.dirname(__file__))
-from _lib import build_response
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from _lib import build_response, init_secrets
+
+init_secrets()
+
+app = FastAPI(title="Model Meter API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 
-class handler(BaseHTTPRequestHandler):
-    def _send_json(self, status: int, body: dict) -> None:
-        payload = json.dumps(body).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(payload)
+@app.get("/api/models")
+def get_models():
+    try:
+        return build_response()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
-    def do_OPTIONS(self) -> None:
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.end_headers()
 
-    def do_GET(self) -> None:
-        try:
-            data = build_response()
-            self._send_json(200, data)
-        except Exception as exc:
-            self._send_json(500, {"error": str(exc)})
+@app.post("/api/refresh")
+def post_refresh():
+    return {"status": "ok"}
 
-    def do_POST(self) -> None:
-        # /api/refresh — Vercel is stateless so nothing to clear, just 200
-        self._send_json(200, {"status": "ok"})
 
-    def log_message(self, fmt, *args) -> None:
-        pass
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
