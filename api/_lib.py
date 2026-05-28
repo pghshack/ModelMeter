@@ -1,20 +1,12 @@
+"""Shared model-matching logic for local FastAPI server and Vercel handler."""
 import json
 import os
 import re
-import threading
-import time
 import urllib.request
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="Model Meter")
-
-STATIC_DIR = Path(__file__).parent / "public"
-
-
-def _init_secrets() -> None:
+def init_secrets() -> None:
     path = Path.home() / ".secrets" / "api_keys.env"
     if path.exists():
         with open(path) as f:
@@ -25,42 +17,37 @@ def _init_secrets() -> None:
                     os.environ.setdefault(k, v)
 
 
-_init_secrets()
-HATZ_KEY = os.environ["HATZ_API_KEY"]
-AA_KEY = os.environ["ARTIFICIALANALYSIS_API_KEY"]
-
-
-def _http_get(url: str, headers: dict) -> dict:
+def http_get(url: str, headers: dict) -> dict:
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
 
 
 def fetch_hatz_models() -> list:
-    data = _http_get("https://ai.hatz.ai/v1/chat/models", {"X-API-Key": HATZ_KEY})
+    key = os.environ["HATZ_API_KEY"]
+    data = http_get("https://ai.hatz.ai/v1/chat/models", {"X-API-Key": key})
     return data["data"]
 
 
 def fetch_aa_models() -> list:
-    data = _http_get(
+    key = os.environ["ARTIFICIALANALYSIS_API_KEY"]
+    data = http_get(
         "https://artificialanalysis.ai/api/v2/data/llms/models",
-        {"x-api-key": AA_KEY},
+        {"x-api-key": key},
     )
     return data["data"]
 
 
-def _slugify(s: str) -> str:
+def slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
-# Hatz model ID → Artificial Analysis slug (overrides for edge cases)
 SLUG_OVERRIDES: dict[str, str] = {
     "mistral.mixtral-8x7b-instruct-v0:1": "mixtral-8x7b-instruct",
     "anthropic.claude-haiku-4-5": "claude-4-5-haiku",
     "amazon.nova-2-lite-v1:0": "nova-2-0-omni-reasoning-medium",
 }
 
-# Models to exclude — routing proxies, image-only, or not in AA
 SKIP_IDS: set[str] = {
     "auto",
     "us.meta.llama3-2-1b-instruct-v1:0",
@@ -72,7 +59,6 @@ SKIP_IDS: set[str] = {
     "grok-2-vision-1212",
     "gemini-2-5-flash-image",
     "google.gemini-3-pro-image-preview",
-    "google.gemini-3.1-flash-image-preview",
 }
 
 PROVIDER_COLORS: dict[str, str] = {
@@ -89,16 +75,16 @@ PROVIDER_COLORS: dict[str, str] = {
     "Qwen": "#0e7490",
     "Moonshot AI": "#0f766e",
     "GLM": "#4338ca",
-    "Hatz": "#6366f1",
+    "Z AI": "#4338ca",
 }
 
 
-def _find_aa_match(display_name: str, aa_by_slug: dict, aa_name_pairs: list) -> dict | None:
-    hatz_slug = _slugify(display_name)
+def find_aa_match(display_name: str, aa_by_slug: dict, aa_name_pairs: list):
+    hatz_slug = slugify(display_name)
 
-    aa_m = aa_by_slug.get(hatz_slug)
-    if aa_m:
-        return aa_m
+    m = aa_by_slug.get(hatz_slug)
+    if m:
+        return m
 
     for slug, m in aa_by_slug.items():
         if hatz_slug in slug or slug in hatz_slug:
@@ -117,24 +103,21 @@ def match_models(hatz_models: list, aa_models: list) -> list:
     aa_name_pairs = [(m["name"].lower(), m) for m in aa_models]
 
     result = []
-
     for hm in hatz_models:
         hatz_id = hm["name"]
-
         if hatz_id in SKIP_IDS:
             continue
 
         if hatz_id in SLUG_OVERRIDES:
             aa_m = aa_by_slug.get(SLUG_OVERRIDES[hatz_id])
         else:
-            aa_m = _find_aa_match(hm["display_name"], aa_by_slug, aa_name_pairs)
+            aa_m = find_aa_match(hm["display_name"], aa_by_slug, aa_name_pairs)
 
         if not aa_m:
             continue
 
         evals = aa_m["evaluations"]
         pricing = aa_m["pricing"]
-
         intel = evals.get("artificial_analysis_intelligence_index")
         cost = pricing.get("price_1m_blended_3_to_1")
 
@@ -142,7 +125,6 @@ def match_models(hatz_models: list, aa_models: list) -> list:
             continue
 
         developer = hm["developer"]
-
         result.append({
             "id": hatz_id,
             "name": hm["display_name"],
@@ -163,43 +145,8 @@ def match_models(hatz_models: list, aa_models: list) -> list:
     return sorted(result, key=lambda x: x["intelligence"], reverse=True)
 
 
-_cache: dict = {"data": None, "ts": 0.0}
-_cache_lock = threading.Lock()
-CACHE_TTL = 3600
-
-
-def get_models() -> list:
-    with _cache_lock:
-        if _cache["data"] and time.time() - _cache["ts"] < CACHE_TTL:
-            return _cache["data"]
-
-        hatz_models = fetch_hatz_models()
-        aa_models = fetch_aa_models()
-        data = match_models(hatz_models, aa_models)
-
-        _cache["data"] = data
-        _cache["ts"] = time.time()
-        return data
-
-
-@app.get("/api/models")
-def api_models():
-    try:
-        return {"models": get_models(), "cached_at": _cache["ts"]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/refresh")
-def api_refresh():
-    with _cache_lock:
-        _cache["ts"] = 0.0
-    return {"status": "cache cleared"}
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
-
-
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+def build_response() -> dict:
+    init_secrets()
+    hatz = fetch_hatz_models()
+    aa = fetch_aa_models()
+    return {"models": match_models(hatz, aa)}
