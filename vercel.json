@@ -1,12 +1,5 @@
 {
-  "builds": [
-    { "src": "api/models.py", "use": "@vercel/python" },
-    { "src": "public/**", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/:path*", "dest": "/api/models.py" },
-    { "src": "/pgh-logo.png", "dest": "/public/pgh-logo.png" },
-    { "src": "/app.js", "dest": "/public/app.js" },
-    { "src": "/(.*)", "dest": "/public/index.html" }
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/models" }
   ]
 }
