@@ -1,0 +1,13 @@
+# Project-level .gitignore
+# (global ~/.gitignore_global covers secrets, .DS_Store, Python artifacts, editors)
+
+# uv
+.venv/
+.python-version
+
+# Logs
+logs/
+*.log
+
+# Local dev overrides
+.env.local

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Meter — Hatz.AI Intelligence vs. Cost</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --accent: #2563eb;
+      --quadrant: rgba(187, 247, 208, 0.35);
+      --quadrant-border: rgba(34, 197, 94, 0.4);
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+
+    .logo-text h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+
+    .logo-text p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .model-count {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .model-count span { color: var(--text); font-weight: 600; }
+
+    .refresh-btn {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Filters bar ── */
+    .filters {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-right: 4px;
+    }
+
+    .filter-chip {
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: white;
+      color: var(--text-muted);
+      transition: all .15s;
+      white-space: nowrap;
+    }
+
+    .filter-chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .filter-chip:hover:not(.active) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .filter-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+
+    /* ── Main layout ── */
+    main {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .chart-area {
+      flex: 1;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .chart-header {
+      margin-bottom: 16px;
+    }
+
+    .chart-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .chart-subtitle {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .chart-container {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      min-height: 460px;
+    }
+
+    #chart { width: 100% !important; height: 100% !important; }
+
+    .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.85);
+      backdrop-filter: blur(2px);
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading p { font-size: 13px; color: var(--text-muted); }
+
+    /* ── Legend ── */
+    .legend {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 3px 0;
+      opacity: 1;
+      transition: opacity .15s;
+    }
+
+    .legend-item.muted { opacity: 0.35; }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Side panel ── */
+    .side-panel {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .panel-placeholder {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .panel-placeholder p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .model-detail {
+      padding: 18px;
+      display: none;
+    }
+
+    .model-detail.visible { display: block; }
+
+    .detail-name {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .detail-provider {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .detail-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .badge-vision { background: #dbeafe; color: #1d4ed8; }
+    .badge-quadrant { background: #dcfce7; color: #166534; }
+
+    .detail-metrics { margin-top: 14px; }
+
+    .metric-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .metric-row:last-child { border-bottom: none; }
+
+    .metric-label { color: var(--text-muted); }
+
+    .metric-value {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-bar-wrap {
+      width: 100%;
+      height: 4px;
+      background: #f1f5f9;
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+
+    .metric-bar {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+
+    .detail-section { margin-top: 14px; }
+    .detail-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .cost-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .cost-card {
+      background: #f8f9fa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .cost-card-label { font-size: 10.5px; color: var(--text-muted); }
+    .cost-card-value { font-size: 14px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+    .aa-link {
+      display: block;
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .aa-link a { color: var(--accent); text-decoration: none; }
+    .aa-link a:hover { text-decoration: underline; }
+
+    /* ── Quadrant legend ── */
+    .quadrant-legend {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    .quadrant-swatch {
+      width: 14px;
+      height: 14px;
+      background: var(--quadrant-border);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* ── Error state ── */
+    .error-msg {
+      padding: 24px;
+      text-align: center;
+      color: #dc2626;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">M²</div>
+    <div class="logo-text">
+      <h1>Model Meter</h1>
+      <p>Intelligence &amp; cost for Hatz.AI models · powered by Artificial Analysis</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="model-count" id="modelCount"><span>—</span> models</div>
+    <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="filters">
+  <span class="filter-label">Show:</span>
+  <button class="filter-chip active" data-filter="all">All models</button>
+  <button class="filter-chip" data-filter="vision">Vision capable</button>
+  <div class="filter-sep"></div>
+  <span class="filter-label">Provider:</span>
+  <div id="providerFilters"></div>
+</div>
+
+<main>
+  <div class="chart-area">
+    <div class="chart-header">
+      <div class="chart-title">Intelligence vs. Cost to Run</div>
+      <div class="chart-subtitle">
+        Artificial Analysis Intelligence Index · Cost per 1M tokens (USD, log scale) · Top-left is best value
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="chart"></canvas>
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading model data…</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:12px;">
+      <div class="quadrant-legend">
+        <div class="quadrant-swatch"></div>
+        Most attractive quadrant (high intelligence, low cost)
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <div class="side-panel" id="sidePanel">
+    <div class="panel-header">Model Details</div>
+    <div class="panel-placeholder" id="panelPlaceholder">
+      <p>Click any model on the chart to see its full metrics</p>
+    </div>
+    <div class="model-detail" id="modelDetail"></div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
