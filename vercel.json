@@ -1,5 +1,16 @@
 {
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/models" }
+  "builds": [
+    { "src": "api/models.py", "use": "@vercel/python" },
+    { "src": "public/index.html", "use": "@vercel/static" },
+    { "src": "public/app.js", "use": "@vercel/static" },
+    { "src": "public/pgh-logo.png", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/models", "dest": "/api/models.py" },
+    { "src": "/api/health", "dest": "/api/models.py" },
+    { "src": "/api/refresh", "dest": "/api/models.py" },
+    { "src": "/app.js", "dest": "/public/app.js" },
+    { "src": "/pgh-logo.png", "dest": "/public/pgh-logo.png" },
+    { "src": "/(.*)", "dest": "/public/index.html" }
   ]
 }
