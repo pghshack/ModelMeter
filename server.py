@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Model Meter")
 
-STATIC_DIR = Path(__file__).parent / "api" / "public"
+STATIC_DIR = Path(__file__).parent / "public"
 
 
 def _init_secrets() -> None:

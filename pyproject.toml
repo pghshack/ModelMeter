@@ -21,10 +21,6 @@ ignore = []
 quote-style = "double"
 indent-style = "space"
 
-# --- Vercel ---
-[tool.vercel]
-entrypoint = "api.models:app"
-
 # --- pytest ---
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
