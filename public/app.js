@@ -14,6 +14,22 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// In dark mode, lighten provider colors whose luminance is too low to see
+// against the dark chart background (e.g. OpenAI #18181b ≈ black).
+function toVisibleColor(hex, isDark) {
+  if (!isDark || !hex || !hex.startsWith("#") || hex.length !== 7) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum > 0.18) return hex; // already bright enough
+  const t = 0.75;
+  const nr = Math.round(r + (180 - r) * t);
+  const ng = Math.round(g + (180 - g) * t);
+  const nb = Math.round(b + (188 - b) * t);
+  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}
+
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 async function loadData() {
@@ -56,7 +72,9 @@ function buildProviderFilters() {
   const container = document.getElementById("providerFilters");
   container.innerHTML = "";
   providers.forEach(p => {
-    const color = allModels.find(m => m.developer === p)?.color || "#888";
+    const rawColor = allModels.find(m => m.developer === p)?.color || "#888";
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const color = toVisibleColor(rawColor, isDark);
     const chip = document.createElement("button");
     chip.className = "filter-chip";
     chip.dataset.provider = p;
@@ -84,7 +102,9 @@ function buildLegend(models) {
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
   providers.forEach(p => {
-    const color = models.find(m => m.developer === p)?.color || "#888";
+    const rawColor = models.find(m => m.developer === p)?.color || "#888";
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const color = toVisibleColor(rawColor, isDark);
     const item = document.createElement("div");
     item.className = "legend-item";
     item.innerHTML = `<div class="legend-dot" style="background:${color}"></div>${p}`;
@@ -122,9 +142,9 @@ function renderChart() {
   const datasets = Object.entries(byProvider).map(([provider, pModels]) => ({
     label: provider,
     data: pModels.map(m => ({ x: m.cost_per_1m, y: m.intelligence, model: m })),
-    backgroundColor: pModels[0].color,
-    borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.6)",
-    borderWidth: 1.5,
+    backgroundColor: toVisibleColor(pModels[0].color, isDark),
+    borderColor: isDark ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.6)",
+    borderWidth: isDark ? 2 : 1.5,
     pointRadius: 7,
     pointHoverRadius: 10,
   }));
@@ -267,7 +287,7 @@ function showPanel(m) {
   const ctx = Math.round(m.max_tokens / 1000);
 
   detail.innerHTML = `
-    <div class="detail-name" style="color:${m.color}">${m.name}</div>
+    <div class="detail-name" style="color:${toVisibleColor(m.color, document.documentElement.getAttribute('data-theme') === 'dark')}">${m.name}</div>
     <div class="detail-provider">${m.developer}</div>
 
     ${m.vision ? `<span class="detail-badge badge-vision">Vision</span>` : ""}
